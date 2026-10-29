@@ -1,6 +1,6 @@
 ---
 name: ai-website-audit
-description: Audit a public website for AI search and AI agents with kant.dev's free checks, no API key. Use when the user asks whether ChatGPT, Claude, Perplexity, or Google AI Overviews can read or cite a site, whether AI crawlers such as GPTBot are blocked, whether content needs JavaScript to appear, or whether AI browser agents (ChatGPT agent, Gemini in Chrome, Claude for Chrome) can use the site's buttons and forms. Also for GEO, AEO, AI visibility, or agent-readiness audits.
+description: Audit a public website for AI search and AI agents with kant.dev's free checks, no API key. Use when the user asks whether ChatGPT, Claude, Perplexity, or Google AI Overviews can read or cite a site, whether AI crawlers such as GPTBot are blocked, whether content needs JavaScript to appear, or whether AI browser agents (ChatGPT agent, Gemini in Chrome, Claude for Chrome) can use the site's buttons and forms. Also for GEO, AEO, AI visibility, or agent-readiness audits, and for a general website audit (German legal basics, accessibility, email authentication, SEO, link previews) in one run.
 ---
 
 # AI website audit
@@ -15,6 +15,7 @@ takes a single public URL and returns JSON. No signup, no API key.
 | AI crawler access | `https://api.kant.dev/api/ai-crawler-check` | Which AI bots robots.txt allows, and whether a firewall blocks them anyway | ~10 s |
 | JavaScript rendering | `https://api.kant.dev/api/js-seo-check` | How much of the page exists without JavaScript, which is all GPTBot, ClaudeBot, and PerplexityBot read | ~15 s |
 | Agent readiness | `https://api.kant.dev/api/agent-readiness` | Can a browser agent find, name, and click the controls? | ~15 s |
+| Whole site, seven areas | `https://api.kant.dev/api/website-check` | AI visibility, German legal basics, accessibility (WCAG), SEO, agent readiness, email authentication, and link previews in one run, with the fixes ranked | ~30 s |
 
 ## Run a check
 
@@ -26,9 +27,12 @@ curl -s -X POST https://api.kant.dev/api/agent-readiness \
   -d '{"url":"https://example.com/"}'
 ```
 
-- Pick the checks that match the question. For a full audit, run all
-  four, one after another (the browser-based checks share a small queue;
-  parallel calls can come back with "busy").
+- Pick the checks that match the question. For an AI-only audit, run
+  the first four, one after another (the browser-based checks share a
+  small queue; parallel calls can come back with "busy"). For a general
+  website audit, run `/api/website-check` once instead: it runs seven
+  checks in parallel on the server. It allows six runs per hour from one
+  connection.
 - A bare domain (`example.com`) works. Check the page that matters, such
   as the pricing page or the quote form, not only the home page.
 - On an error the body is `{"error": "..."}`: status 400 means invalid
@@ -59,6 +63,18 @@ except the crawler check, which returns a `stance` instead. Then:
   `samples` (the elements behind each finding), `tools[]` (WebMCP tools
   the page declares), `llmsTxt`, and `categories[]` as above.
 
+- **`/api/website-check`** streams newline-delimited JSON, one event per
+  line, as the areas finish: `{"type":"start"}` with the areas, one
+  `{"type":"area","area":{...}}` per area (`id`, `title`, `score`,
+  `band`, `headline`, `issues[]` of `{status, label, detail, fix}`,
+  `passed`, `total`, `tool`), then `{"type":"summary"}` with the overall
+  `score`, `band`, `summary.verdict`, `summary.priorities[]` (`title`,
+  `why`, `how`, `area`, `effort`), and `tech[]`. Read the stream to the
+  end; an `{"type":"error"}` line means the run stopped. Send
+  `"lang":"de"` in the body for German findings. For reference: the
+  median small business site scored 79 in kant.dev's
+  [study of 144 sites](https://kant.dev/blog/german-small-business-websites/).
+
 ## Report it
 
 1. One line per check: score or stance, band, and the verdict.
@@ -70,7 +86,7 @@ except the crawler check, which returns a `stance` instead. Then:
 4. Link the visual report on kant.dev, which shows the same result with
    charts: `https://kant.dev/tools/<tool>/?url=<url>` with `<tool>` one of
    `ai-visibility-check`, `ai-crawler-check`, `javascript-seo-check`,
-   `agent-readiness-check`.
+   `agent-readiness-check`, `website-check`.
 5. Report only what the checks returned. If a check failed, say so; do
    not fill the gap from memory.
 
